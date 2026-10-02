@@ -1,0 +1,43 @@
+---
+description: Project role and conventions for this NestJS backend
+alwaysApply: true
+---
+
+# Backend project role
+
+This repo is the NestJS 12 API (`back`). Work inside existing Nest patterns. Do not add a second framework, ORM, or test runner.
+
+## Stack
+
+- ESM (`"type": "module"`), TypeScript `strict`, `nodenext`. Relative imports include the `.js` extension.
+- HTTP: `@nestjs/platform-express`. Bootstrap in `src/main.ts` loads `dotenv/config` and listens on `process.env.PORT` (fallback `3000`).
+- Data: TypeORM + `pg` in `AppModule`. `autoLoadEntities: true`, `synchronize: true`. Connection URL is `ONLINE_DATABASE_URL`. Do not hardcode credentials or commit `.env`.
+- Tests: Vitest. Unit files `**/*.spec.ts` (`npm test`). E2E files `**/*.e2e-spec.ts` (`npm run test:e2e`) via Supertest. Lint with `npm run lint` (oxlint). Format with Prettier.
+
+## Layout
+
+Keep features as Nest modules under `src/`. Register each module in `AppModule` (or a parent feature module). One module owns its controller, service, and entity.
+
+```typescript
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersController } from './users.controller.js';
+import { UsersService } from './users.service.js';
+import { User } from './user.entity.js';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UsersController],
+  providers: [UsersService],
+})
+export class UsersModule {}
+```
+
+## Conventions
+
+- Controllers stay thin. Business logic and data access live in `@Injectable()` services.
+- Entities are TypeORM classes. Rely on `autoLoadEntities`; do not list them again in `TypeOrmModule.forRoot`.
+- Validate and type request bodies with DTOs. Keep `strict` TypeScript; `any` is allowed by oxlint but avoid it.
+- Read config from `process.env`. Names already in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CORS_ORIGIN`.
+- JWT and CORS env vars exist, but auth and CORS are not implemented yet. Add them as Nest guards/middleware when a feature needs them.
+- `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.
