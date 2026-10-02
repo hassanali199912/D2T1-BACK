@@ -10,34 +10,82 @@ This repo is the NestJS 12 API (`back`). Work inside existing Nest patterns. Do 
 ## Stack
 
 - ESM (`"type": "module"`), TypeScript `strict`, `nodenext`. Relative imports include the `.js` extension.
-- HTTP: `@nestjs/platform-express`. Bootstrap in `src/main.ts` loads `dotenv/config` and listens on `process.env.PORT` (fallback `3000`).
-- Data: TypeORM + `pg` in `AppModule`. `autoLoadEntities: true`, `synchronize: true`. Connection URL is `ONLINE_DATABASE_URL`. Do not hardcode credentials or commit `.env`.
+- HTTP: `NestExpressApplication` in `src/main.ts`. `dotenv/config` loads env. Listen on `process.env.PORT` (fallback `3000`). Dev server: `npm run dev`.
+- Bootstrap enables CORS from `CORS_ORIGIN` (`credentials: true`, `Authorization` allowed), serves `uploads/` at `/uploads/`, and applies a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`).
+- Data: TypeORM + `pg` in `AppModule`. `autoLoadEntities: true`, `synchronize: true`, schema `public`. Connection URL is `ONLINE_DATABASE_URL`. Do not hardcode credentials or commit `.env`.
+- Validation: `class-validator` and `class-transformer` on DTO classes. The global pipe strips and rejects unknown fields.
 - Tests: Vitest. Unit files `**/*.spec.ts` (`npm test`). E2E files `**/*.e2e-spec.ts` (`npm run test:e2e`) via Supertest. Lint with `npm run lint` (oxlint). Format with Prettier.
 
 ## Layout
 
-Keep features as Nest modules under `src/`. Register each module in `AppModule` (or a parent feature module). One module owns its controller, service, and entity.
+`AppModule` registers `AppController` and `TypeOrmModule.forRoot`. There is no `AppService`. Features use the four layer folders under `src/`. `domain/entity` holds TypeORM entities. `presentation/dto` holds request DTOs. Add a feature by placing its files in those layers, then import its module from `AppModule`.
+
+```text
+src/
+  main.ts
+  app.module.ts
+  app.controller.ts
+  domain/
+    entity/
+      user.entity.ts
+      role.entity.ts
+      claim.entity.ts
+    users.repository.ts
+    roles.repository.ts
+    claims.repository.ts
+  application/
+    users.service.ts
+    roles.service.ts
+    claims.service.ts
+  infrastructure/
+    users.typeorm-repository.ts
+    roles.typeorm-repository.ts
+    claims.typeorm-repository.ts
+  presentation/
+    dto/
+    users.controller.ts
+    users.module.ts
+    roles.controller.ts
+    roles.module.ts
+    claims.controller.ts
+    claims.module.ts
+```
+
+- `domain/entity` — TypeORM entity classes only (`User`, `Role`, `Claim`).
+- `domain` — repository ports. Each port is an `abstract class` so Nest can inject it. A service depends on the port, not on TypeORM.
+- `application` — `@Injectable()` use-case services. They import `domain` only.
+- `infrastructure` — the only layer that injects TypeORM `Repository<Entity>`. Each class extends the matching port.
+- `presentation` — thin controllers, feature modules, and `dto/` classes with `class-validator`.
+- The feature module lives in `presentation/` and is the only file that imports infrastructure. `TypeOrmModule.forFeature` stays on that module. Do not register entities again in `TypeOrmModule.forRoot`.
 
 ```typescript
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../domain/entity/user.entity.js';
+import { UsersRepository } from '../domain/users.repository.js';
+import { UsersService } from '../application/users.service.js';
+import { UsersTypeOrmRepository } from '../infrastructure/users.typeorm-repository.js';
 import { UsersController } from './users.controller.js';
-import { UsersService } from './users.service.js';
-import { User } from './user.entity.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User])],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [
+    UsersService,
+    { provide: UsersRepository, useClass: UsersTypeOrmRepository },
+  ],
 })
 export class UsersModule {}
 ```
 
+`RolesModule` and `ClaimsModule` follow the same binding. Another feature imports the module and uses the exported service. It does not import the TypeORM repository.
+
 ## Conventions
 
-- Controllers stay thin. Business logic and data access live in `@Injectable()` services.
+- Controllers stay thin. Business logic lives in `application` services. Data access lives in `infrastructure` behind the `domain` repository port.
 - Entities are TypeORM classes. Rely on `autoLoadEntities`; do not list them again in `TypeOrmModule.forRoot`.
-- Validate and type request bodies with DTOs. Keep `strict` TypeScript; `any` is allowed by oxlint but avoid it.
-- Read config from `process.env`. Names already in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CORS_ORIGIN`.
-- JWT and CORS env vars exist, but auth and CORS are not implemented yet. Add them as Nest guards/middleware when a feature needs them.
+- Type request bodies as DTO classes with `class-validator` decorators so the global pipe can validate them.
+- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`.
+- CORS is already configured in `main.ts`. JWT env vars exist, but auth guards are not implemented yet.
+- Put uploaded files in `uploads/`. They are publicly served under `/uploads/`.
 - `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.
