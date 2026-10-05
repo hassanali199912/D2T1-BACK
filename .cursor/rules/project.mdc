@@ -28,25 +28,35 @@ src/
   domain/
     entity/
       user.entity.ts
+      policy.entity.ts
     users.repository.ts
+    policies.repository.ts
+    policy-type.ts
+    policy-language.ts
     password-hasher.ts
     token.service.ts
   application/
     users.service.ts
     auth.service.ts
+    policies.service.ts
   infrastructure/
     users.typeorm-repository.ts
+    policies.typeorm-repository.ts
     bcrypt-password.hasher.ts
     jwt-token.service.ts
+    files.ts
   presentation/
     dto/
       create-user.dto.ts
+      create-policy.dto.ts
       login.dto.ts
       refresh-token.dto.ts
     users.controller.ts
     users.module.ts
     auth.controller.ts
     auth.module.ts
+    policies.controller.ts
+    policies.module.ts
 ```
 
 - `domain/entity` — TypeORM entity classes. `User.role` is the enum `admin` | `employee` on `user.entity.ts`. The table name is `auth_users`, because `public.users` already exists for another role set.
@@ -57,6 +67,7 @@ src/
 - The feature module lives in `presentation/` and is the only file that imports infrastructure. `TypeOrmModule.forFeature` stays on that module. Do not register entities again in `TypeOrmModule.forRoot`.
 - Users: `POST /users`, `GET /users`, `GET /users/:id`. No update or delete. Responses never include `password`.
 - Auth: `POST /auth/login` and `POST /auth/refresh` only. Login checks the hashed password and returns an access token plus a refresh token.
+- Policies: `POST /policies` (multipart field `document`), `GET /policies`, `GET /policies/:id`, `DELETE /policies/:id`. No update. `name`, `version`, and `language` are unique together. `type` is `HEALTH` | `MOTOR` | `PROPERTY`. `language` is `ar` | `en`.
 
 ```typescript
 import { Module } from '@nestjs/common';

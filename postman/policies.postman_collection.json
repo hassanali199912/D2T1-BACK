@@ -1,0 +1,116 @@
+{
+  "info": {
+    "name": "Policies",
+    "description": "Create, read, and delete policy documents.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3030"
+    },
+    {
+      "key": "policyId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Policies",
+      "item": [
+        {
+          "name": "Create policy",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Health Cover",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "value": "HEALTH",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Basic health policy",
+                  "type": "text"
+                },
+                {
+                  "key": "version",
+                  "value": "1.0",
+                  "type": "text"
+                },
+                {
+                  "key": "language",
+                  "value": "en",
+                  "type": "text"
+                },
+                {
+                  "key": "effectiveFrom",
+                  "value": "2026-01-01",
+                  "type": "text"
+                },
+                {
+                  "key": "effectiveTo",
+                  "value": "2026-12-31",
+                  "type": "text"
+                },
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/policies",
+            "description": "Multipart create. type is HEALTH, MOTOR, or PROPERTY. language is ar or en. document is the uploaded file. Dates use YYYY-MM-DD."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('policyId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List policies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/policies"
+          }
+        },
+        {
+          "name": "Get policy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/policies/{{policyId}}",
+            "description": "Run Create policy first so {{policyId}} is set."
+          }
+        },
+        {
+          "name": "Delete policy",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/policies/{{policyId}}",
+            "description": "Deletes the policy row and the uploaded document. Run Create policy first."
+          }
+        }
+      ]
+    }
+  ]
+}
