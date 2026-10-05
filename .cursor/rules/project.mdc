@@ -91,6 +91,6 @@ export class UsersModule {}
 - Type request bodies as DTO classes with `class-validator` decorators so the global pipe can validate them.
 - Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`.
 - CORS is already configured in `main.ts`. Access tokens use `JWT_SECRET` and `JWT_EXPIRES_IN`. Refresh tokens use `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRES_IN`. Route guards are not applied yet.
-- Put uploaded files in `uploads/`. They are publicly served under `/uploads/`.
+- Put uploaded files in `uploads/`. They are publicly served under `/uploads/`. Use `files` from `src/infrastructure/files.ts` for Multer upload, name, url, add, remove, and replace. Do not write upload handling in a controller.
 - `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.
 - When a module's endpoints are finished, add them to the Postman files in `postman/`. One collection per module, named `<module>.postman_collection.json`, with a folder of the same name. Requests use `{{baseUrl}}` and the DTO body. Auth is already in `postman/auth.postman_collection.json`.
