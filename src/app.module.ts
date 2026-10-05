@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as pg from 'pg';
+import { AuthModule } from './presentation/auth.module.js';
+import { UsersModule } from './presentation/users.module.js';
 
 @Module({
   imports: [
@@ -15,7 +17,9 @@ import * as pg from 'pg';
       ssl: {
         rejectUnauthorized: true
       }
-    })
+    }),
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
 })
