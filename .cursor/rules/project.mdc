@@ -10,34 +10,87 @@ This repo is the NestJS 12 API (`back`). Work inside existing Nest patterns. Do 
 ## Stack
 
 - ESM (`"type": "module"`), TypeScript `strict`, `nodenext`. Relative imports include the `.js` extension.
-- HTTP: `@nestjs/platform-express`. Bootstrap in `src/main.ts` loads `dotenv/config` and listens on `process.env.PORT` (fallback `3000`).
-- Data: TypeORM + `pg` in `AppModule`. `autoLoadEntities: true`, `synchronize: true`. Connection URL is `ONLINE_DATABASE_URL`. Do not hardcode credentials or commit `.env`.
+- HTTP: `NestExpressApplication` in `src/main.ts`. `dotenv/config` loads env. Listen on `process.env.PORT` (fallback `3000`). Dev server: `npm run dev`.
+- Bootstrap enables CORS from `CORS_ORIGIN` (`credentials: true`, `Authorization` allowed), serves `uploads/` at `/uploads/`, and applies a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`).
+- Data: TypeORM + `pg` in `AppModule`. `autoLoadEntities: true`, `synchronize: true`, schema `public`. Connection URL is `ONLINE_DATABASE_URL`. Do not hardcode credentials or commit `.env`.
+- Validation: `class-validator` and `class-transformer` on DTO classes. The global pipe strips and rejects unknown fields.
 - Tests: Vitest. Unit files `**/*.spec.ts` (`npm test`). E2E files `**/*.e2e-spec.ts` (`npm run test:e2e`) via Supertest. Lint with `npm run lint` (oxlint). Format with Prettier.
 
 ## Layout
 
-Keep features as Nest modules under `src/`. Register each module in `AppModule` (or a parent feature module). One module owns its controller, service, and entity.
+`AppModule` registers `AppController` and `TypeOrmModule.forRoot`. There is no `AppService`. Features use the four layer folders under `src/`. `domain/entity` holds TypeORM entities. `presentation/dto` holds request DTOs. Add a feature by placing its files in those layers, then import its module from `AppModule`.
+
+```text
+src/
+  main.ts
+  app.module.ts
+  app.controller.ts
+  domain/
+    entity/
+      user.entity.ts
+    users.repository.ts
+    password-hasher.ts
+    token.service.ts
+  application/
+    users.service.ts
+    auth.service.ts
+  infrastructure/
+    users.typeorm-repository.ts
+    bcrypt-password.hasher.ts
+    jwt-token.service.ts
+  presentation/
+    dto/
+      create-user.dto.ts
+      login.dto.ts
+      refresh-token.dto.ts
+    users.controller.ts
+    users.module.ts
+    auth.controller.ts
+    auth.module.ts
+```
+
+- `domain/entity` — TypeORM entity classes. `User.role` is the enum `admin` | `employee` on `user.entity.ts`. The table name is `auth_users`, because `public.users` already exists for another role set.
+- `domain` — ports (`UsersRepository`, `PasswordHasher`, `TokenService`). Each port is an `abstract class` so Nest can inject it. A service depends on the port, not on TypeORM, bcrypt, or JWT.
+- `application` — `@Injectable()` use-case services. They import `domain` only.
+- `infrastructure` — TypeORM repository, bcrypt hasher, and JWT token service. The repository is the only class that injects TypeORM `Repository<Entity>`.
+- `presentation` — thin controllers, feature modules, and `dto/` classes with `class-validator`.
+- The feature module lives in `presentation/` and is the only file that imports infrastructure. `TypeOrmModule.forFeature` stays on that module. Do not register entities again in `TypeOrmModule.forRoot`.
+- Users: `POST /users`, `GET /users`, `GET /users/:id`. No update or delete. Responses never include `password`.
+- Auth: `POST /auth/login` and `POST /auth/refresh` only. Login checks the hashed password and returns an access token plus a refresh token.
 
 ```typescript
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../domain/entity/user.entity.js';
+import { PasswordHasher } from '../domain/password-hasher.js';
+import { UsersRepository } from '../domain/users.repository.js';
+import { UsersService } from '../application/users.service.js';
+import { BcryptPasswordHasher } from '../infrastructure/bcrypt-password.hasher.js';
+import { UsersTypeOrmRepository } from '../infrastructure/users.typeorm-repository.js';
 import { UsersController } from './users.controller.js';
-import { UsersService } from './users.service.js';
-import { User } from './user.entity.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User])],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [
+    UsersService,
+    { provide: UsersRepository, useClass: UsersTypeOrmRepository },
+    { provide: PasswordHasher, useClass: BcryptPasswordHasher },
+  ],
+  exports: [UsersRepository, PasswordHasher],
 })
 export class UsersModule {}
 ```
 
+`AuthModule` imports `UsersModule` and uses the exported `UsersRepository` and `PasswordHasher`. It does not import the TypeORM repository class.
+
 ## Conventions
 
-- Controllers stay thin. Business logic and data access live in `@Injectable()` services.
+- Controllers stay thin. Business logic lives in `application` services. Data access lives in `infrastructure` behind the `domain` repository port.
 - Entities are TypeORM classes. Rely on `autoLoadEntities`; do not list them again in `TypeOrmModule.forRoot`.
-- Validate and type request bodies with DTOs. Keep `strict` TypeScript; `any` is allowed by oxlint but avoid it.
-- Read config from `process.env`. Names already in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CORS_ORIGIN`.
-- JWT and CORS env vars exist, but auth and CORS are not implemented yet. Add them as Nest guards/middleware when a feature needs them.
+- Type request bodies as DTO classes with `class-validator` decorators so the global pipe can validate them.
+- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`.
+- CORS is already configured in `main.ts`. Access tokens use `JWT_SECRET` and `JWT_EXPIRES_IN`. Refresh tokens use `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRES_IN`. Route guards are not applied yet.
+- Put uploaded files in `uploads/`. They are publicly served under `/uploads/`.
 - `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.
+- When a module's endpoints are finished, add them to the Postman files in `postman/`. One collection per module, named `<module>.postman_collection.json`, with a folder of the same name. Requests use `{{baseUrl}}` and the DTO body. Auth is already in `postman/auth.postman_collection.json`.
