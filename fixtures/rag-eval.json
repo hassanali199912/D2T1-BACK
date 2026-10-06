@@ -1,0 +1,42 @@
+[
+  {
+    "id": "en-en",
+    "query": "collision deductible",
+    "direction": "en-to-en",
+    "expectedContent": "Deductible 500 on 2026-01-01",
+    "expectedLanguage": "en",
+    "expectRefusal": false
+  },
+  {
+    "id": "ar-ar",
+    "query": "تغطية التصادم",
+    "direction": "ar-to-ar",
+    "expectedContent": "تغطية التصادم",
+    "expectedLanguage": "ar",
+    "expectRefusal": false
+  },
+  {
+    "id": "ar-en",
+    "query": "هل أضرار التصادم مغطاة",
+    "direction": "ar-to-en",
+    "expectedContent": "Deductible 500 on 2026-01-01",
+    "expectedLanguage": "en",
+    "expectRefusal": false
+  },
+  {
+    "id": "en-ar",
+    "query": "collision coverage",
+    "direction": "en-to-ar",
+    "expectedContent": "تغطية التصادم",
+    "expectedLanguage": "ar",
+    "expectRefusal": false
+  },
+  {
+    "id": "refusal",
+    "query": "quantum banana orbit",
+    "direction": "none",
+    "expectedContent": null,
+    "expectedLanguage": null,
+    "expectRefusal": true
+  }
+]

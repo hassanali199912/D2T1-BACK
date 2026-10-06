@@ -42,6 +42,13 @@ src/
     embedding-provider.ts
     vector-store.ts
     policy-chunks.repository.ts
+    retrieval.types.ts
+    query-processor.ts
+    dense-retriever.ts
+    keyword-retriever.ts
+    fusion-strategy.ts
+    reranker.ts
+    rag-settings.ts
     password-hasher.ts
     token.service.ts
   application/
@@ -49,6 +56,7 @@ src/
     auth.service.ts
     policies.service.ts
     ingestion.service.ts
+    rag.service.ts
   infrastructure/
     users.typeorm-repository.ts
     policies.typeorm-repository.ts
@@ -60,6 +68,12 @@ src/
     section-aware-chunker.ts
     local-embedding.provider.ts
     pgvector.store.ts
+    pgvector-dense.retriever.ts
+    postgres-keyword.retriever.ts
+    reciprocal-rank.fusion.ts
+    term-coverage.reranker.ts
+    whitespace-query.processor.ts
+    rag-settings.ts
     bcrypt-password.hasher.ts
     jwt-token.service.ts
     files.ts
@@ -67,6 +81,7 @@ src/
     dto/
       create-user.dto.ts
       create-policy.dto.ts
+      retrieve.dto.ts
       login.dto.ts
       refresh-token.dto.ts
     users.controller.ts
@@ -75,6 +90,8 @@ src/
     auth.module.ts
     policies.controller.ts
     policies.module.ts
+    rag.controller.ts
+    rag.module.ts
 ```
 
 - `domain/entity` — TypeORM entity classes. `User.role` is the enum `admin` | `employee` on `user.entity.ts`. The table name is `auth_users`, because `public.users` already exists for another role set.
@@ -86,6 +103,7 @@ src/
 - Users: `POST /users`, `GET /users`, `GET /users/:id`. No update or delete. Responses never include `password`.
 - Auth: `POST /auth/login` and `POST /auth/refresh` only. Login checks the hashed password and returns an access token plus a refresh token.
 - Policies: `POST /policies` (multipart field `document`, PDF or DOCX only), `GET /policies`, `GET /policies/:id`, `DELETE /policies/:id`. No update. `name`, `version`, and `language` are unique together. `type` is `HEALTH` | `MOTOR` | `PROPERTY`. `language` is `ar` | `en`. After a successful upload the policy `status` is `UPLOADED`. Indexation then moves it through `PROCESSING` to `INDEXED` or `FAILED`, and `currentStage`, `errorCode`, and `errorMessage` record the latest stage.
+- Retrieval: `POST /rag/retrieve` only. It returns ranked chunks and citations, or a refusal when evidence is weak. It does not generate an answer. `policyId`, `policyVersionId`, and `documentId` all filter `policy_chunks.policy_id`. `language` filters only when it is `ar` or `en`.
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -118,7 +136,7 @@ export class UsersModule {}
 - Controllers stay thin. Business logic lives in `application` services. Data access lives in `infrastructure` behind the `domain` repository port.
 - Entities are TypeORM classes. Rely on `autoLoadEntities`; do not list them again in `TypeOrmModule.forRoot`.
 - Type request bodies as DTO classes with `class-validator` decorators so the global pipe can validate them.
-- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CHUNK_MAX_TOKENS`, `CHUNK_OVERLAP_TOKENS`.
+- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CHUNK_MAX_TOKENS`, `CHUNK_OVERLAP_TOKENS`, `RAG_TOP_K`, `RAG_DENSE_TOP_K`, `RAG_KEYWORD_TOP_K`, `RAG_FINAL_TOP_K`, `RAG_MIN_SCORE`, `RAG_RERANK_ENABLED`.
 - CORS is already configured in `main.ts`. Access tokens use `JWT_SECRET` and `JWT_EXPIRES_IN`. Refresh tokens use `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRES_IN`. Route guards are not applied yet.
 - Put uploaded files in `uploads/`. They are publicly served under `/uploads/`. Use `files` from `src/infrastructure/files.ts` for Multer upload, name, url, add, remove, and replace. Do not write upload handling in a controller.
 - `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.

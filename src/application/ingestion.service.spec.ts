@@ -7,7 +7,7 @@ import { PolicyLanguage } from '../domain/policy-language.js';
 import { EmbeddingProvider } from '../domain/embedding-provider.js';
 import { DocumentExtractor } from '../domain/document-extractor.js';
 import { ExtractedDocument } from '../domain/extracted-document.js';
-import { VectorChunk, VectorStore } from '../domain/vector-store.js';
+import { VectorChunk, VectorSearchHit, VectorStore } from '../domain/vector-store.js';
 import { SectionAwareChunker } from '../infrastructure/section-aware-chunker.js';
 import { WhitespaceTextCleaner } from '../infrastructure/whitespace-text.cleaner.js';
 import { IngestionService } from './ingestion.service.js';
@@ -116,6 +116,10 @@ class MemoryVectors extends VectorStore {
   async deleteByPolicyId(policyId: string): Promise<void> {
     this.deleted.push(policyId);
     this.stored = this.stored.filter((chunk) => chunk.policyId !== policyId);
+  }
+
+  search(): Promise<VectorSearchHit[]> {
+    return Promise.resolve([]);
   }
 }
 

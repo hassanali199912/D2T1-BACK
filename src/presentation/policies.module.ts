@@ -38,5 +38,6 @@ import { PoliciesController } from './policies.controller.js';
     { provide: PoliciesRepository, useClass: PoliciesTypeOrmRepository },
     { provide: PolicyChunksRepository, useClass: PolicyChunksTypeOrmRepository },
   ],
+  exports: [EmbeddingProvider, VectorStore],
 })
 export class PoliciesModule {}
