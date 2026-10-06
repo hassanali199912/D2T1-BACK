@@ -1,0 +1,38 @@
+{
+  "info": {
+    "name": "Rag",
+    "description": "Retrieve ranked policy chunks. This does not generate an answer. language AUTO searches both languages. policyId, policyVersionId, and documentId all filter the same policy row.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3030"
+    }
+  ],
+  "item": [
+    {
+      "name": "Rag",
+      "item": [
+        {
+          "name": "Retrieve evidence",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"هل أضرار التصادم مغطاة؟\",\n  \"topK\": 5,\n  \"language\": \"AUTO\"\n}"
+            },
+            "url": "{{baseUrl}}/rag/retrieve",
+            "description": "Returns ranked chunks and citations. hasSufficientEvidence is false when the corpus has no reliable match. Poll a policy until status is INDEXED before searching it."
+          }
+        }
+      ]
+    }
+  ]
+}

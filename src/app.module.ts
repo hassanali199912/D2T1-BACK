@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as pg from 'pg';
 import { AuthModule } from './presentation/auth.module.js';
 import { PoliciesModule } from './presentation/policies.module.js';
+import { RagModule } from './presentation/rag.module.js';
 import { UsersModule } from './presentation/users.module.js';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './presentation/users.module.js';
     UsersModule,
     AuthModule,
     PoliciesModule,
+    RagModule,
   ],
   controllers: [AppController],
 })

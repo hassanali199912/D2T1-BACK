@@ -24,7 +24,7 @@ export class LocalEmbeddingProvider extends EmbeddingProvider {
   private model(): Promise<FeatureExtractionPipeline> {
     if (!this.extractor) {
       this.extractor = import('@xenova/transformers').then(({ pipeline }) =>
-        pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2'),
+        pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2'),
       );
     }
     return this.extractor;
