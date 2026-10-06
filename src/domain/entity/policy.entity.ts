@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { PolicyIndexStage, PolicyIndexStatus } from '../policy-index-status.js';
 import { PolicyLanguage } from '../policy-language.js';
 import { PolicyType } from '../policy-type.js';
 
@@ -31,4 +32,26 @@ export class Policy {
 
   @Column({ name: 'document_url', type: 'text' })
   documentUrl: string;
+
+  @Column({
+    type: 'enum',
+    enum: PolicyIndexStatus,
+    enumName: 'policy_index_status',
+    default: PolicyIndexStatus.Uploaded,
+  })
+  status: PolicyIndexStatus;
+
+  @Column({
+    type: 'enum',
+    enum: PolicyIndexStage,
+    enumName: 'policy_index_stage',
+    nullable: true,
+  })
+  currentStage: PolicyIndexStage | null;
+
+  @Column({ name: 'error_code', type: 'varchar', length: 80, nullable: true })
+  errorCode: string | null;
+
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  errorMessage: string | null;
 }

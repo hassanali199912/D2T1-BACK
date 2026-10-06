@@ -69,7 +69,7 @@
               ]
             },
             "url": "{{baseUrl}}/policies",
-            "description": "Multipart create. type is HEALTH, MOTOR, or PROPERTY. language is ar or en. document is the uploaded file. Dates use YYYY-MM-DD."
+            "description": "Multipart create. document must be a PDF or DOCX. A successful response has status UPLOADED and starts indexation in the background. Poll Get policy for status PROCESSING, INDEXED, or FAILED."
           },
           "event": [
             {
@@ -98,7 +98,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/policies/{{policyId}}",
-            "description": "Run Create policy first so {{policyId}} is set."
+            "description": "Run Create policy first. status, currentStage, errorCode, and errorMessage show indexation progress."
           }
         },
         {
@@ -107,7 +107,7 @@
             "method": "DELETE",
             "header": [],
             "url": "{{baseUrl}}/policies/{{policyId}}",
-            "description": "Deletes the policy row and the uploaded document. Run Create policy first."
+            "description": "Deletes the policy, its uploaded file, and its indexed chunks. Run Create policy first."
           }
         }
       ]

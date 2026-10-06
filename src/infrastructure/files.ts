@@ -47,6 +47,11 @@ export const files = {
     return `/uploads/${storedName(name)}`;
   },
 
+  absolutePathFromUrl(documentUrl: string): string {
+    const name = storedName(documentUrl.split('/').pop() ?? '');
+    return join(UPLOADS_DIR, name);
+  },
+
   async add(file: Express.Multer.File): Promise<StoredFile> {
     const upload = asUpload(file);
     const name = files.name(upload.originalname);

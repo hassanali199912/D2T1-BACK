@@ -1,9 +1,11 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Policy } from '../domain/entity/policy.entity.js';
 import { PoliciesRepository } from '../domain/policies.repository.js';
+import { PolicyIndexStatus } from '../domain/policy-index-status.js';
 import { PolicyLanguage } from '../domain/policy-language.js';
 import { PolicyType } from '../domain/policy-type.js';
 import { files } from '../infrastructure/files.js';
+import { IngestionService } from './ingestion.service.js';
 
 export type CreatePolicyInput = {
   name: string;
@@ -17,7 +19,12 @@ export type CreatePolicyInput = {
 
 @Injectable()
 export class PoliciesService {
-  constructor(private readonly policiesRepository: PoliciesRepository) {}
+  private readonly logger = new Logger(PoliciesService.name);
+
+  constructor(
+    private readonly policiesRepository: PoliciesRepository,
+    private readonly ingestion: IngestionService,
+  ) {}
 
   async create(input: CreatePolicyInput, document: Express.Multer.File): Promise<Policy> {
     const name = input.name.trim();
@@ -31,9 +38,10 @@ export class PoliciesService {
       throw new ConflictException('A policy with this name, version, and language already exists');
     }
 
+    assertSupportedDocument(document);
     const stored = await files.add(document);
     try {
-      return await this.policiesRepository.create({
+      const policy = await this.policiesRepository.create({
         name,
         type: input.type,
         description: blankToNull(input.description),
@@ -42,7 +50,16 @@ export class PoliciesService {
         effectiveFrom: input.effectiveFrom,
         effectiveTo: blankToNull(input.effectiveTo),
         documentUrl: stored.url,
+        status: PolicyIndexStatus.Uploaded,
+        currentStage: null,
+        errorCode: null,
+        errorMessage: null,
       });
+      void this.ingestion.ingest(policy.id).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Policy ingestion failed';
+        this.logger.error(message, error instanceof Error ? error.stack : undefined);
+      });
+      return policy;
     } catch (error) {
       await files.remove(stored.name);
       throw error;
@@ -63,6 +80,7 @@ export class PoliciesService {
 
   async remove(id: string): Promise<void> {
     const policy = await this.findById(id);
+    await this.ingestion.clear(id);
     await this.policiesRepository.deleteById(id);
     const documentName = policy.documentUrl.split('/').pop();
     if (documentName) {
@@ -74,4 +92,18 @@ export class PoliciesService {
 function blankToNull(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+const PDF_MIME = 'application/pdf';
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+function assertSupportedDocument(file: Express.Multer.File): void {
+  const name = file.originalname?.toLowerCase() ?? '';
+  const mime = file.mimetype?.toLowerCase() ?? '';
+  const pdf = name.endsWith('.pdf') && (mime === '' || mime === PDF_MIME || mime === 'application/octet-stream');
+  const docx =
+    name.endsWith('.docx') && (mime === '' || mime === DOCX_MIME || mime === 'application/octet-stream');
+  if (!pdf && !docx) {
+    throw new BadRequestException('Only PDF and DOCX documents are accepted');
+  }
 }

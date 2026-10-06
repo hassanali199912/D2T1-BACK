@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Policy } from '../domain/entity/policy.entity.js';
-import { NewPolicy, PoliciesRepository, PolicyIdentity } from '../domain/policies.repository.js';
+import { NewPolicy, PoliciesRepository, PolicyIdentity, PolicyIndexUpdate } from '../domain/policies.repository.js';
 
 @Injectable()
 export class PoliciesTypeOrmRepository extends PoliciesRepository {
@@ -31,5 +31,9 @@ export class PoliciesTypeOrmRepository extends PoliciesRepository {
 
   async deleteById(id: string): Promise<void> {
     await this.policies.delete(id);
+  }
+
+  async updateIndexState(id: string, update: PolicyIndexUpdate): Promise<void> {
+    await this.policies.update(id, update);
   }
 }
