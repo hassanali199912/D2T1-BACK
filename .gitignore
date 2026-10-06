@@ -23,3 +23,7 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# uploaded files
+/uploads/*
+!/uploads/.gitkeep
