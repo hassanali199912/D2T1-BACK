@@ -4,6 +4,9 @@
 /build
 /tmp
 
+# Uploaded files
+/uploads
+
 # Logs
 logs
 *.log
