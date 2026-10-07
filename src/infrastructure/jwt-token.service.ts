@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { UserRole } from '../domain/entity/user.entity.js';
 import {
   AccessTokenPayload,
   RefreshTokenPayload,
@@ -29,6 +30,28 @@ export class JwtTokenService extends TokenService {
         expiresIn: this.expiresIn('JWT_REFRESH_EXPIRES_IN'),
       },
     );
+  }
+
+  async verifyAccess(token: string): Promise<AccessTokenPayload | null> {
+    try {
+      const payload = await this.jwt.verifyAsync<{
+        sub?: string;
+        email?: string;
+        role?: UserRole;
+        typ?: string;
+      }>(token, { secret: this.env('JWT_SECRET') });
+      if (
+        payload.typ === REFRESH_TOKEN_TYPE ||
+        !payload.sub ||
+        !payload.email ||
+        (payload.role !== UserRole.Admin && payload.role !== UserRole.Employee)
+      ) {
+        return null;
+      }
+      return { sub: payload.sub, email: payload.email, role: payload.role };
+    } catch {
+      return null;
+    }
   }
 
   async verifyRefresh(token: string): Promise<RefreshTokenPayload | null> {

@@ -60,6 +60,17 @@ class FakeTokenService extends TokenService {
     }
     return Promise.resolve({ sub: token.slice('refresh:'.length) });
   }
+
+  verifyAccess(token: string): Promise<AccessTokenPayload | null> {
+    if (!token.startsWith('access:')) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve({
+      sub: token.slice('access:'.length),
+      email: 'hassan@example.com',
+      role: UserRole.Employee,
+    });
+  }
 }
 
 describe('AuthService', () => {

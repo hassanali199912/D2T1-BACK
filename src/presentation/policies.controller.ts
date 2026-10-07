@@ -29,6 +29,11 @@ export class PoliciesController {
     return this.policiesService.findAll();
   }
 
+  @Get('options')
+  listOptions() {
+    return this.policiesService.listOptions();
+  }
+
   @Get(':id')
   findById(@Param('id', ParseUUIDPipe) id: string) {
     return this.policiesService.findById(id);

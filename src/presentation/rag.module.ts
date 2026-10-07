@@ -18,6 +18,7 @@ import { RagController } from './rag.controller.js';
 @Module({
   imports: [PoliciesModule],
   controllers: [RagController],
+  exports: [RagService],
   providers: [
     RagService,
     { provide: RAG_SETTINGS, useFactory: ragSettingsFromEnv },

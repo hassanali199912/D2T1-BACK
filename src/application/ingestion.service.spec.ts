@@ -45,6 +45,12 @@ class MemoryPolicies extends PoliciesRepository {
     return Promise.resolve(null);
   }
 
+  findFamily(name: string, language: PolicyLanguage): Promise<Policy[]> {
+    return Promise.resolve(
+      this.policy.name === name && this.policy.language === language ? [this.policy] : [],
+    );
+  }
+
   deleteById(): Promise<void> {
     return Promise.resolve();
   }

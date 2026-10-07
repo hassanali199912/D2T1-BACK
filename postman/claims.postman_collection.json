@@ -1,0 +1,148 @@
+{
+  "info": {
+    "name": "Claims",
+    "description": "Create, list, read, and update claims. Send Authorization: Bearer {{accessToken}} from the Auth login request. A new claim is SUBMITTED. admin can see every claim. employee can see only claims they created.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3030"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "policyId",
+      "value": ""
+    },
+    {
+      "key": "claimId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Claims",
+      "item": [
+        {
+          "name": "List claim types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/claims/types",
+            "description": "Accident types for the claim form select. Submit value as claimType."
+          }
+        },
+        {
+          "name": "Create claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyId\": \"{{policyId}}\",\n  \"incidentDate\": \"2026-01-02\",\n  \"claimType\": \"COLLISION\",\n  \"claimedAmount\": 80000,\n  \"description\": \"The insured vehicle was involved in a collision.\"\n}"
+            },
+            "url": "{{baseUrl}}/claims"
+          }
+        },
+        {
+          "name": "List claims",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/claims?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["claims"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get claim",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/claims/{{claimId}}"
+          }
+        },
+        {
+          "name": "Update claim",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated collision note.\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/{{claimId}}"
+          }
+        },
+        {
+          "name": "Analyze claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/claims/{{claimId}}/analyze"
+          }
+        },
+        {
+          "name": "Get latest analysis",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/claims/{{claimId}}/analysis"
+          }
+        }
+      ]
+    }
+  ]
+}
