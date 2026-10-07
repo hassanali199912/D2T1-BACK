@@ -9,13 +9,21 @@ import { ClaimAnalysesTypeOrmRepository } from '../infrastructure/claim-analyses
 import { JwtAccessGuard } from '../infrastructure/jwt-access.guard.js';
 import { OpenAiClaimAnalyzer } from '../infrastructure/openai-claim-analyzer.js';
 import { AdjudicationController } from './adjudication.controller.js';
+import { ApprovalsModule } from './approvals.module.js';
 import { AuthModule } from './auth.module.js';
 import { ClaimsModule } from './claims.module.js';
 import { PoliciesModule } from './policies.module.js';
 import { RagModule } from './rag.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ClaimAnalysis]), AuthModule, ClaimsModule, PoliciesModule, RagModule],
+  imports: [
+    TypeOrmModule.forFeature([ClaimAnalysis]),
+    AuthModule,
+    ClaimsModule,
+    PoliciesModule,
+    RagModule,
+    ApprovalsModule,
+  ],
   controllers: [AdjudicationController],
   providers: [
     AdjudicationService,

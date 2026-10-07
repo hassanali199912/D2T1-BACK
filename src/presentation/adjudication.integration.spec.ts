@@ -47,6 +47,18 @@ describeDb('claim analysis HTTP', () => {
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
+      await dataSource.query(
+        `DELETE FROM approval_audits WHERE approval_id IN (
+           SELECT a.id FROM approvals a
+           JOIN claims c ON c.id = a.claim_id
+           WHERE c.policy_id = ANY($1)
+         )`,
+        [[earlyId, currentId]],
+      );
+      await dataSource.query(
+        `DELETE FROM approvals WHERE claim_id IN (SELECT id FROM claims WHERE policy_id = ANY($1))`,
+        [[earlyId, currentId]],
+      );
       await dataSource.query('DELETE FROM claim_analyses WHERE policy_version_id = ANY($1)', [[earlyId, currentId]]);
       await dataSource.query('DELETE FROM claims WHERE policy_id = ANY($1)', [[earlyId, currentId]]);
       await dataSource.query('DELETE FROM policies WHERE id = ANY($1)', [[earlyId, currentId]]);
