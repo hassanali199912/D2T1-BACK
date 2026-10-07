@@ -139,7 +139,7 @@ Set `AI_BASE_URL` (for example `https://api.openai.com/v1`), `AI_API_KEY`, and `
 
 Returns the latest saved analysis for that claim, or `404` `ANALYSIS_NOT_FOUND`.
 
-When analysis status is `COMPLETED`, the API also creates a `PENDING` approval and sets the claim to `UNDER_REVIEW`. Failed or insufficient-evidence runs do not open an approval.
+When analysis finishes, the API also creates a `PENDING` approval and sets the claim to `UNDER_REVIEW`. That includes `COMPLETED`, `INSUFFICIENT_EVIDENCE`, and `FAILED` runs. Incomplete runs store recommendation `REVIEW` with reasoning `No evidence to support a decision.` and payout `0.00`.
 
 ## Approvals
 

@@ -58,7 +58,7 @@ describe('AdjudicationService', () => {
     expect(approvals.created).toHaveLength(1);
   });
 
-  it('does not call the model when retrieval returns no evidence', async () => {
+  it('opens a pending approval when retrieval returns no evidence', async () => {
     evidence.result = { chunks: [], citations: [] };
 
     const result = await service.analyze('claim-1', employee);
@@ -66,15 +66,19 @@ describe('AdjudicationService', () => {
     expect(result.status).toBe(AnalysisStatus.InsufficientEvidence);
     expect(result.message).toBe('Not enough information in the corpus.');
     expect(analyzer.requests).toHaveLength(0);
-    expect(approvals.created).toHaveLength(0);
+    expect(approvals.created).toHaveLength(1);
+    expect(approvals.created[0]?.recommendation?.decision).toBe('REVIEW');
+    expect(approvals.created[0]?.recommendation?.reasoning).toBe('No evidence to support a decision.');
   });
 
-  it('rejects a limit that is not in the cited text', async () => {
+  it('rejects a limit that is not in the cited text and still opens an approval', async () => {
     analyzer.body.financialFacts = { coverageLimit: 100000, deductible: 10000 };
 
     await expect(service.analyze('claim-1', employee)).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(analyses.rows[0]?.errorCode).toBe('AI_FACT_CONFLICT');
-    expect(analyses.rows[0]?.calculatedPayout).toBeNull();
+    expect(analyses.rows[0]?.calculatedPayout).toBe('0.00');
+    expect(approvals.created).toHaveLength(1);
+    expect(approvals.created[0]?.recommendation?.reasoning).toBe('No evidence to support a decision.');
   });
 
   it('rejects the claim when an exclusion applies', async () => {
