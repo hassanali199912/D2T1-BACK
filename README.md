@@ -1,5 +1,12 @@
 # Insurance API
 
+Project docs (demo path, MVP design, evaluation, security):
+
+- [docs/README.md](docs/README.md) — quick start and 5-minute demo
+- [docs/SYSTEM-DESIGN.md](docs/SYSTEM-DESIGN.md) — MVP architecture and gap table
+- [docs/EVALUATION.md](docs/EVALUATION.md) — retrieval and payout measurements
+- [docs/SECURITY.md](docs/SECURITY.md) — controls mapped to threats
+
 Base URL for the dashboard: `http://localhost:3030`.
 
 Start the API with `npm run dev`. CORS allows `CORS_ORIGIN` (typically `http://localhost:5173`) and the `Authorization` header.
