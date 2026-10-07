@@ -15,11 +15,12 @@ Call these in order when building the claims screen.
 3. `GET /claims/types` to fill the accident-type select. Show `label`. Submit `value` as `claimType`.
 4. `POST /claims` to save the form. The server sets `claimNumber`, `status` (`SUBMITTED`), and `createdBy`.
 5. `GET /claims` for the table, and `GET /claims/:id` for one row.
-6. `POST /claims/:id/analyze` when the user asks for analysis. Read the saved run again with `GET /claims/:id/analysis`.
+6. `POST /claims/:id/analyze` when the user asks for analysis. A completed run opens a `PENDING` approval and sets the claim to `UNDER_REVIEW`. Read the saved run with `GET /claims/:id/analysis`.
+7. As `admin`, use `GET /approvals` for the queue, then `POST /approvals/:id/approve`, `/reject`, or `/edit-and-approve`.
 
 Seeded accounts use password `password1`: `admin@example.com` and `employee@example.com`.
 
-`admin` can list, read, update, and analyze every claim. `employee` can create claims and can list, read, update, and analyze only claims they created. Another person's claim returns `403` with `UNAUTHORIZED_CLAIM_ACCESS`.
+`admin` can list, read, update, and analyze every claim, and is the only reviewer on approvals. `employee` can create claims and can list, read, update, and analyze only claims they created. Another person's claim returns `403` with `UNAUTHORIZED_CLAIM_ACCESS`. An employee on approvals returns `403` `UNAUTHORIZED_REVIEWER`.
 
 ## Auth
 
@@ -137,6 +138,55 @@ Set `AI_BASE_URL` (for example `https://api.openai.com/v1`), `AI_API_KEY`, and `
 ### `GET /claims/:id/analysis`
 
 Returns the latest saved analysis for that claim, or `404` `ANALYSIS_NOT_FOUND`.
+
+When analysis status is `COMPLETED`, the API also creates a `PENDING` approval and sets the claim to `UNDER_REVIEW`. Failed or insufficient-evidence runs do not open an approval.
+
+## Approvals
+
+All approvals routes require `Authorization: Bearer <accessToken>` and the `admin` role.
+
+A completed analysis stores an AI recommendation snapshot on the approval. Human actions never overwrite that snapshot. Final decision and final payout are stored separately and audited.
+
+Claim status after review:
+
+- Approve → claim `APPROVED`
+- Reject → claim `REJECTED`
+- Edit and approve with `finalDecision: APPROVE` → claim `APPROVED`
+- Edit and approve with `finalDecision: REJECT` → claim `REJECTED`
+
+### `GET /approvals`
+
+Lists approvals. Defaults to `status=PENDING`. Query also accepts `page`, `limit`, and `status`.
+
+### `GET /approvals/:id`
+
+One approval with claim, policy, analysis, original recommendation, final decision, and audit history.
+
+### `POST /approvals/:id/approve`
+
+Accepts the AI payout. Sets approval `APPROVED` and claim `APPROVED`. A second call returns `409` `APPROVAL_NOT_PENDING`.
+
+### `POST /approvals/:id/reject`
+
+```json
+{
+  "comment": "The incident description does not match the policy conditions."
+}
+```
+
+`comment` is required. Sets final payout to `0.00`, approval `REJECTED`, and claim `REJECTED`.
+
+### `POST /approvals/:id/edit-and-approve`
+
+```json
+{
+  "finalDecision": "APPROVE",
+  "finalPayout": 45000,
+  "comment": "Adjusted payout based on manual review."
+}
+```
+
+`comment` is required. For `APPROVE`, `finalPayout` is required and must be ≤ `min(claimedAmount, coverageLimit)`. Over that limit is `400` `INVALID_FINAL_PAYOUT`. Approval status becomes `EDITED_AND_APPROVED`.
 
 ## Project setup
 

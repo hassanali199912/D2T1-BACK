@@ -18,6 +18,7 @@ export type ClaimUpdate = {
   claimedAmount?: string;
   description?: string;
   incidentDate?: string;
+  status?: ClaimStatus;
 };
 
 export type ClaimPageQuery = {

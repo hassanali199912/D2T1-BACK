@@ -32,6 +32,8 @@ src/
       policy-chunk.entity.ts
       claim.entity.ts
       claim-analysis.entity.ts
+      approval.entity.ts
+      approval-audit.entity.ts
     users.repository.ts
     policies.repository.ts
     policy-type.ts
@@ -61,6 +63,9 @@ src/
     payout-calculator.ts
     ai-claim-analysis.ts
     money-evidence.ts
+    approval-status.ts
+    approvals.repository.ts
+    approval-not-pending.error.ts
     password-hasher.ts
     token.service.ts
   application/
@@ -71,6 +76,7 @@ src/
     rag.service.ts
     claims.service.ts
     adjudication.service.ts
+    approvals.service.ts
     evidence-builder.ts
     prompts/
       claim-analysis.v1.ts
@@ -97,6 +103,7 @@ src/
     claims.typeorm-repository.ts
     claim-analyses.typeorm-repository.ts
     openai-claim-analyzer.ts
+    approvals.typeorm-repository.ts
     files.ts
   presentation/
     dto/
@@ -106,6 +113,9 @@ src/
       create-claim.dto.ts
       update-claim.dto.ts
       claims-query.dto.ts
+      approvals-query.dto.ts
+      reject-approval.dto.ts
+      edit-approval.dto.ts
       login.dto.ts
       refresh-token.dto.ts
     users.controller.ts
@@ -120,6 +130,8 @@ src/
     claims.module.ts
     adjudication.controller.ts
     adjudication.module.ts
+    approvals.controller.ts
+    approvals.module.ts
 ```
 
 - `domain/entity` — TypeORM entity classes. `User.role` is the enum `admin` | `employee` on `user.entity.ts`. The table name is `auth_users`, because `public.users` already exists for another role set.
@@ -133,7 +145,8 @@ src/
 - Policies: `POST /policies` (multipart field `document`, PDF or DOCX only), `GET /policies`, `GET /policies/options`, `GET /policies/:id`, `DELETE /policies/:id`. No update. `name`, `version`, and `language` are unique together. `type` is `HEALTH` | `MOTOR` | `PROPERTY`. `language` is `ar` | `en`. After a successful upload the policy `status` is `UPLOADED`. Indexation then moves it through `PROCESSING` to `INDEXED` or `FAILED`, and `currentStage`, `errorCode`, and `errorMessage` record the latest stage.
 - Retrieval: `POST /rag/retrieve` only. It returns ranked chunks and citations, or a refusal when evidence is weak. It does not generate an answer. `policyId`, `policyVersionId`, and `documentId` all filter `policy_chunks.policy_id`. `language` filters only when it is `ar` or `en`.
 - Claims: `POST /claims`, `GET /claims/types`, `GET /claims`, `GET /claims/:id`, `PATCH /claims/:id`. These routes require `Authorization: Bearer <accessToken>`. A new claim is `SUBMITTED`. The client cannot set `status`, `createdBy`, or `claimNumber`. `admin` can read and update every claim. `employee` can read and update only claims they created. Deleting a policy that still has claims returns `409` `POLICY_HAS_CLAIMS`.
-- Analysis: `POST /claims/:id/analyze` and `GET /claims/:id/analysis` use the same access token and the same admin/employee rule. The incident date selects one policy row with the same name and language. Retrieval stays in `RagService`. Payout is calculated in code. `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` configure the model call.
+- Analysis: `POST /claims/:id/analyze` and `GET /claims/:id/analysis` use the same access token and the same admin/employee rule. The incident date selects one policy row with the same name and language. Retrieval stays in `RagService`. Payout is calculated in code. `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` configure the model call. A completed analysis opens a `PENDING` approval and sets the claim to `UNDER_REVIEW`.
+- Approvals: `GET /approvals`, `GET /approvals/:id`, `POST /approvals/:id/approve`, `POST /approvals/:id/reject`, `POST /approvals/:id/edit-and-approve`. Admin only. Reject requires a comment. Edited payout must not exceed `min(claimedAmount, coverageLimit)`. AI recommendation is preserved; final decision and payout are audited. Claim becomes `APPROVED` or `REJECTED`.
 
 ```typescript
 import { Module } from '@nestjs/common';

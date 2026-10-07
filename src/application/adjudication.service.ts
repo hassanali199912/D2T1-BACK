@@ -23,6 +23,7 @@ import { NoApplicablePolicyVersionError, selectPolicyVersion } from '../domain/p
 import { PoliciesRepository } from '../domain/policies.repository.js';
 import { INSUFFICIENT_EVIDENCE_MESSAGE } from '../domain/evidence-validator.js';
 import { Citation } from '../domain/retrieval.types.js';
+import { ApprovalsService } from './approvals.service.js';
 import { ClaimActor } from './claims.service.js';
 import { CollectedEvidence, EvidenceBuilder } from './evidence-builder.js';
 import { CLAIM_ANALYSIS_PROMPT, CLAIM_ANALYSIS_PROMPT_VERSION } from './prompts/claim-analysis.v1.js';
@@ -67,6 +68,7 @@ export class AdjudicationService {
     private readonly analyses: ClaimAnalysesRepository,
     private readonly evidenceBuilder: EvidenceBuilder,
     private readonly analyzer: ClaimAnalyzer,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async analyze(claimId: string, actor: ClaimActor): Promise<AnalysisView> {
@@ -160,7 +162,7 @@ export class AdjudicationService {
       const saved = await this.analyses.create({
         ...filled(claim, version, parsed, cited, moneyOrNull(limit), moneyOrNull(deductible), '0.00', 'REJECT'),
       });
-      return toView(saved, claim, version);
+      return this.complete(saved, claim, version);
     }
 
     if (limit === undefined || deductible === undefined) {
@@ -194,7 +196,12 @@ export class AdjudicationService {
     const saved = await this.analyses.create(
       filled(claim, version, parsed, cited, limit.toFixed(2), deductible.toFixed(2), payout, decision),
     );
-    return toView(saved, claim, version);
+    return this.complete(saved, claim, version);
+  }
+
+  private async complete(analysis: ClaimAnalysis, claim: Claim, version: Policy): Promise<AnalysisView> {
+    await this.approvals.createFromAnalysis(analysis, claim);
+    return toView(analysis, claim, version);
   }
 
   private async requireClaim(claimId: string, actor: ClaimActor): Promise<Claim> {

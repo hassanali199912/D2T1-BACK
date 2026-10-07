@@ -16,6 +16,7 @@ import { PolicyLanguage } from '../domain/policy-language.js';
 import { PolicyType } from '../domain/policy-type.js';
 import { PoliciesRepository } from '../domain/policies.repository.js';
 import { Citation } from '../domain/retrieval.types.js';
+import { ApprovalsService } from './approvals.service.js';
 
 const employee = { id: 'employee-1', role: UserRole.Employee };
 const admin = { id: 'admin-1', role: UserRole.Admin };
@@ -24,13 +25,22 @@ describe('AdjudicationService', () => {
   let analyses: MemoryAnalyses;
   let analyzer: MemoryAnalyzer;
   let evidence: MemoryEvidence;
+  let approvals: FakeApprovals;
   let service: AdjudicationService;
 
   beforeEach(() => {
     analyses = new MemoryAnalyses();
     analyzer = new MemoryAnalyzer();
     evidence = new MemoryEvidence(sampleEvidence());
-    service = new AdjudicationService(new MemoryClaims(), new MemoryPolicies(), analyses, evidence as unknown as EvidenceBuilder, analyzer);
+    approvals = new FakeApprovals();
+    service = new AdjudicationService(
+      new MemoryClaims(),
+      new MemoryPolicies(),
+      analyses,
+      evidence as unknown as EvidenceBuilder,
+      analyzer,
+      approvals as unknown as ApprovalsService,
+    );
   });
 
   it('calculates payout from cited evidence and stores the analysis', async () => {
@@ -45,6 +55,7 @@ describe('AdjudicationService', () => {
     expect(result.recommendation?.decision).toBe('APPROVE');
     expect(analyses.rows).toHaveLength(1);
     expect(analyzer.requests[0]?.policy.policyId).toBe('v3');
+    expect(approvals.created).toHaveLength(1);
   });
 
   it('does not call the model when retrieval returns no evidence', async () => {
@@ -55,6 +66,7 @@ describe('AdjudicationService', () => {
     expect(result.status).toBe(AnalysisStatus.InsufficientEvidence);
     expect(result.message).toBe('Not enough information in the corpus.');
     expect(analyzer.requests).toHaveLength(0);
+    expect(approvals.created).toHaveLength(0);
   });
 
   it('rejects a limit that is not in the cited text', async () => {
@@ -94,6 +106,15 @@ describe('AdjudicationService', () => {
     expect(result.claim.claimNumber).toBe('CLM-000001');
   });
 });
+
+class FakeApprovals {
+  created: ClaimAnalysis[] = [];
+
+  createFromAnalysis(analysis: ClaimAnalysis): Promise<void> {
+    this.created.push(analysis);
+    return Promise.resolve();
+  }
+}
 
 class MemoryAnalyzer extends ClaimAnalyzer {
   requests: AnalysisRequest[] = [];
