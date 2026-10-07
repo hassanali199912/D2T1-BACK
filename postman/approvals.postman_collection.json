@@ -1,0 +1,73 @@
+{
+  "info": {
+    "name": "Approvals",
+    "description": "Admin-only approval queue. A PENDING approval is created when claim analysis completes. Approve, reject, or edit-and-approve. Employees receive 403 UNAUTHORIZED_REVIEWER.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3030" },
+    { "key": "accessToken", "value": "" },
+    { "key": "approvalId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Approvals",
+      "item": [
+        {
+          "name": "List pending approvals",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/approvals?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get approval",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/approvals/{{approvalId}}"
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/approvals/{{approvalId}}/approve"
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"The incident description does not match the policy conditions.\"\n}"
+            },
+            "url": "{{baseUrl}}/approvals/{{approvalId}}/reject"
+          }
+        },
+        {
+          "name": "Edit and approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"finalDecision\": \"APPROVE\",\n  \"finalPayout\": 45000,\n  \"comment\": \"Adjusted payout based on manual review.\"\n}"
+            },
+            "url": "{{baseUrl}}/approvals/{{approvalId}}/edit-and-approve"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -23,6 +23,7 @@ import { NoApplicablePolicyVersionError, selectPolicyVersion } from '../domain/p
 import { PoliciesRepository } from '../domain/policies.repository.js';
 import { INSUFFICIENT_EVIDENCE_MESSAGE } from '../domain/evidence-validator.js';
 import { Citation } from '../domain/retrieval.types.js';
+import { ApprovalsService } from './approvals.service.js';
 import { ClaimActor } from './claims.service.js';
 import { CollectedEvidence, EvidenceBuilder } from './evidence-builder.js';
 import { CLAIM_ANALYSIS_PROMPT, CLAIM_ANALYSIS_PROMPT_VERSION } from './prompts/claim-analysis.v1.js';
@@ -67,6 +68,7 @@ export class AdjudicationService {
     private readonly analyses: ClaimAnalysesRepository,
     private readonly evidenceBuilder: EvidenceBuilder,
     private readonly analyzer: ClaimAnalyzer,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async analyze(claimId: string, actor: ClaimActor): Promise<AnalysisView> {
@@ -109,8 +111,10 @@ export class AdjudicationService {
 
     const evidence = await this.evidenceBuilder.collect(claim, version);
     if (evidence.chunks.length === 0) {
-      const saved = await this.analyses.create(blank(claim, version, AnalysisStatus.InsufficientEvidence, null));
-      return toView(saved, claim, version, INSUFFICIENT_EVIDENCE_MESSAGE);
+      const saved = await this.analyses.create(
+        withoutEvidence(claim, version, AnalysisStatus.InsufficientEvidence, null),
+      );
+      return this.complete(saved, claim, version, INSUFFICIENT_EVIDENCE_MESSAGE);
     }
 
     let raw: unknown;
@@ -143,15 +147,14 @@ export class AdjudicationService {
       (limit !== undefined && !amountAppearsInText(limit, citedText)) ||
       (deductible !== undefined && !amountAppearsInText(deductible, citedText))
     ) {
-      await this.analyses.create({
-        ...blank(claim, version, AnalysisStatus.Failed, 'AI_FACT_CONFLICT'),
+      const saved = await this.analyses.create({
+        ...withoutEvidence(claim, version, AnalysisStatus.Failed, 'AI_FACT_CONFLICT'),
         coverageResult: parsed.coverage,
         exclusions: parsed.exclusions,
         anomalies: parsed.anomalies,
-        recommendation: parsed.recommendation,
-        aiReasoning: parsed.coverage.reasoning,
         citations: cited,
       });
+      await this.approvals.createFromAnalysis(saved, claim);
       throw new UnprocessableEntityException('AI_FACT_CONFLICT');
     }
 
@@ -160,19 +163,18 @@ export class AdjudicationService {
       const saved = await this.analyses.create({
         ...filled(claim, version, parsed, cited, moneyOrNull(limit), moneyOrNull(deductible), '0.00', 'REJECT'),
       });
-      return toView(saved, claim, version);
+      return this.complete(saved, claim, version);
     }
 
     if (limit === undefined || deductible === undefined) {
       const saved = await this.analyses.create({
-        ...blank(claim, version, AnalysisStatus.InsufficientEvidence, null),
+        ...withoutEvidence(claim, version, AnalysisStatus.InsufficientEvidence, null),
         coverageResult: parsed.coverage,
         exclusions: parsed.exclusions,
         anomalies: parsed.anomalies,
-        aiReasoning: parsed.coverage.reasoning,
         citations: cited,
       });
-      return toView(saved, claim, version, INSUFFICIENT_EVIDENCE_MESSAGE);
+      return this.complete(saved, claim, version, INSUFFICIENT_EVIDENCE_MESSAGE);
     }
 
     let payout: string;
@@ -184,7 +186,10 @@ export class AdjudicationService {
       }).toFixed(2);
     } catch (error) {
       if (error instanceof CalculationError) {
-        await this.analyses.create(blank(claim, version, AnalysisStatus.Failed, 'CALCULATION_ERROR'));
+        const saved = await this.analyses.create(
+          withoutEvidence(claim, version, AnalysisStatus.Failed, 'CALCULATION_ERROR'),
+        );
+        await this.approvals.createFromAnalysis(saved, claim);
         throw new InternalServerErrorException('CALCULATION_ERROR');
       }
       throw error;
@@ -194,7 +199,17 @@ export class AdjudicationService {
     const saved = await this.analyses.create(
       filled(claim, version, parsed, cited, limit.toFixed(2), deductible.toFixed(2), payout, decision),
     );
-    return toView(saved, claim, version);
+    return this.complete(saved, claim, version);
+  }
+
+  private async complete(
+    analysis: ClaimAnalysis,
+    claim: Claim,
+    version: Policy,
+    message: string | null = null,
+  ): Promise<AnalysisView> {
+    await this.approvals.createFromAnalysis(analysis, claim);
+    return toView(analysis, claim, version, message);
   }
 
   private async requireClaim(claimId: string, actor: ClaimActor): Promise<Claim> {
@@ -210,13 +225,21 @@ export class AdjudicationService {
 
   private async fail(claim: Claim, version: Policy, error: unknown): Promise<never> {
     if (error instanceof AiInvalidResponseError) {
-      await this.analyses.create(blank(claim, version, AnalysisStatus.Failed, 'AI_INVALID_RESPONSE'));
+      const saved = await this.analyses.create(
+        withoutEvidence(claim, version, AnalysisStatus.Failed, 'AI_INVALID_RESPONSE'),
+      );
+      await this.approvals.createFromAnalysis(saved, claim);
       throw new BadGatewayException('AI_INVALID_RESPONSE');
     }
-    await this.analyses.create(blank(claim, version, AnalysisStatus.Failed, 'AI_PROVIDER_ERROR'));
+    const saved = await this.analyses.create(
+      withoutEvidence(claim, version, AnalysisStatus.Failed, 'AI_PROVIDER_ERROR'),
+    );
+    await this.approvals.createFromAnalysis(saved, claim);
     throw new BadGatewayException('AI_PROVIDER_ERROR');
   }
 }
+
+const NO_EVIDENCE_REASON = 'No evidence to support a decision.';
 
 function requestFor(claim: Claim, version: Policy, evidence: CollectedEvidence): AnalysisRequest {
   return {
@@ -255,6 +278,20 @@ function blank(claim: Claim, version: Policy, status: AnalysisStatus, errorCode:
     aiReasoning: null,
     citations: null,
     promptVersion: CLAIM_ANALYSIS_PROMPT_VERSION,
+  };
+}
+
+function withoutEvidence(
+  claim: Claim,
+  version: Policy,
+  status: AnalysisStatus,
+  errorCode: string | null,
+): NewClaimAnalysis {
+  return {
+    ...blank(claim, version, status, errorCode),
+    recommendation: { decision: 'REVIEW', reasoning: NO_EVIDENCE_REASON },
+    aiReasoning: NO_EVIDENCE_REASON,
+    calculatedPayout: '0.00',
   };
 }
 
