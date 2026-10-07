@@ -36,6 +36,7 @@ export abstract class PoliciesRepository {
   abstract findAll(): Promise<Policy[]>;
   abstract findById(id: string): Promise<Policy | null>;
   abstract findByIdentity(identity: PolicyIdentity): Promise<Policy | null>;
+  abstract findFamily(name: string, language: PolicyLanguage): Promise<Policy[]>;
   abstract deleteById(id: string): Promise<void>;
   abstract updateIndexState(id: string, update: PolicyIndexUpdate): Promise<void>;
 }

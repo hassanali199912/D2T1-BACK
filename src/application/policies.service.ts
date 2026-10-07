@@ -1,11 +1,20 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Policy } from '../domain/entity/policy.entity.js';
 import { PoliciesRepository } from '../domain/policies.repository.js';
+import { PolicyInUseError } from '../domain/policy-in-use.error.js';
 import { PolicyIndexStatus } from '../domain/policy-index-status.js';
 import { PolicyLanguage } from '../domain/policy-language.js';
 import { PolicyType } from '../domain/policy-type.js';
 import { files } from '../infrastructure/files.js';
 import { IngestionService } from './ingestion.service.js';
+
+export type PolicyOption = {
+  id: string;
+  name: string;
+  version: string;
+  language: PolicyLanguage;
+  type: PolicyType;
+};
 
 export type CreatePolicyInput = {
   name: string;
@@ -70,6 +79,17 @@ export class PoliciesService {
     return this.policiesRepository.findAll();
   }
 
+  async listOptions(): Promise<PolicyOption[]> {
+    const policies = await this.policiesRepository.findAll();
+    return policies.map((policy) => ({
+      id: policy.id,
+      name: policy.name,
+      version: policy.version,
+      language: policy.language,
+      type: policy.type,
+    }));
+  }
+
   async findById(id: string): Promise<Policy> {
     const policy = await this.policiesRepository.findById(id);
     if (!policy) {
@@ -80,8 +100,15 @@ export class PoliciesService {
 
   async remove(id: string): Promise<void> {
     const policy = await this.findById(id);
+    try {
+      await this.policiesRepository.deleteById(id);
+    } catch (error) {
+      if (error instanceof PolicyInUseError) {
+        throw new ConflictException('POLICY_HAS_CLAIMS');
+      }
+      throw error;
+    }
     await this.ingestion.clear(id);
-    await this.policiesRepository.deleteById(id);
     const documentName = policy.documentUrl.split('/').pop();
     if (documentName) {
       await files.remove(documentName);

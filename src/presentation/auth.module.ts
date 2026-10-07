@@ -10,5 +10,6 @@ import { UsersModule } from './users.module.js';
   imports: [UsersModule, JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, { provide: TokenService, useClass: JwtTokenService }],
+  exports: [TokenService],
 })
 export class AuthModule {}

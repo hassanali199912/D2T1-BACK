@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as pg from 'pg';
+import { AdjudicationModule } from './presentation/adjudication.module.js';
 import { AuthModule } from './presentation/auth.module.js';
+import { ClaimsModule } from './presentation/claims.module.js';
 import { PoliciesModule } from './presentation/policies.module.js';
 import { RagModule } from './presentation/rag.module.js';
 import { UsersModule } from './presentation/users.module.js';
@@ -24,6 +26,8 @@ import { UsersModule } from './presentation/users.module.js';
     AuthModule,
     PoliciesModule,
     RagModule,
+    ClaimsModule,
+    AdjudicationModule,
   ],
   controllers: [AppController],
 })

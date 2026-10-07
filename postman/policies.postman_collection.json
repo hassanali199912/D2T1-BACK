@@ -93,6 +93,15 @@
           }
         },
         {
+          "name": "List policy options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/policies/options",
+            "description": "Use this for the claim form policy select. Submit the chosen id as policyId."
+          }
+        },
+        {
           "name": "Get policy",
           "request": {
             "method": "GET",

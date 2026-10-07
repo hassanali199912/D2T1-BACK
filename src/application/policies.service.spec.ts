@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Policy } from '../domain/entity/policy.entity.js';
+import { PolicyInUseError } from '../domain/policy-in-use.error.js';
 import { NewPolicy, PoliciesRepository, PolicyIdentity, PolicyIndexUpdate } from '../domain/policies.repository.js';
 import { PolicyIndexStatus } from '../domain/policy-index-status.js';
 import { PolicyLanguage } from '../domain/policy-language.js';
@@ -23,6 +24,12 @@ class InMemoryPoliciesRepository extends PoliciesRepository {
 
   findById(id: string): Promise<Policy | null> {
     return Promise.resolve(this.policies.find((policy) => policy.id === id) ?? null);
+  }
+
+  findFamily(name: string, language: PolicyLanguage): Promise<Policy[]> {
+    return Promise.resolve(
+      this.policies.filter((policy) => policy.name === name && policy.language === language),
+    );
   }
 
   findByIdentity(identity: PolicyIdentity): Promise<Policy | null> {
@@ -104,6 +111,20 @@ describe('PoliciesService', () => {
     expect(ingestion.ids).toEqual(['policy-1']);
   });
 
+  it('lists policy names for a select control', async () => {
+    await service.create(input, pdfFile());
+
+    await expect(service.listOptions()).resolves.toEqual([
+      {
+        id: 'policy-1',
+        name: 'Health Cover',
+        version: '1.0',
+        language: PolicyLanguage.EN,
+        type: PolicyType.HEALTH,
+      },
+    ]);
+  });
+
   it('rejects a file that is not a PDF or DOCX before saving it', async () => {
     await expect(
       service.create(input, {
@@ -148,6 +169,15 @@ describe('PoliciesService', () => {
     expect(repository.policies).toHaveLength(0);
     expect(ingestion.cleared).toEqual(['policy-1']);
     expect(files.remove).toHaveBeenCalledWith('doc.pdf');
+  });
+
+  it('keeps the policy when claims still reference it', async () => {
+    await service.create(input, pdfFile());
+    repository.deleteById = () => Promise.reject(new PolicyInUseError());
+
+    await expect(service.remove('policy-1')).rejects.toBeInstanceOf(ConflictException);
+    expect(ingestion.cleared).toEqual([]);
+    expect(repository.policies).toHaveLength(1);
   });
 });
 

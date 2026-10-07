@@ -30,6 +30,8 @@ src/
       user.entity.ts
       policy.entity.ts
       policy-chunk.entity.ts
+      claim.entity.ts
+      claim-analysis.entity.ts
     users.repository.ts
     policies.repository.ts
     policy-type.ts
@@ -49,6 +51,16 @@ src/
     fusion-strategy.ts
     reranker.ts
     rag-settings.ts
+    claim-status.ts
+    claim-type.ts
+    claims.repository.ts
+    claim-analyses.repository.ts
+    claim-analyzer.ts
+    analysis-status.ts
+    policy-version.ts
+    payout-calculator.ts
+    ai-claim-analysis.ts
+    money-evidence.ts
     password-hasher.ts
     token.service.ts
   application/
@@ -57,6 +69,11 @@ src/
     policies.service.ts
     ingestion.service.ts
     rag.service.ts
+    claims.service.ts
+    adjudication.service.ts
+    evidence-builder.ts
+    prompts/
+      claim-analysis.v1.ts
   infrastructure/
     users.typeorm-repository.ts
     policies.typeorm-repository.ts
@@ -76,12 +93,19 @@ src/
     rag-settings.ts
     bcrypt-password.hasher.ts
     jwt-token.service.ts
+    jwt-access.guard.ts
+    claims.typeorm-repository.ts
+    claim-analyses.typeorm-repository.ts
+    openai-claim-analyzer.ts
     files.ts
   presentation/
     dto/
       create-user.dto.ts
       create-policy.dto.ts
       retrieve.dto.ts
+      create-claim.dto.ts
+      update-claim.dto.ts
+      claims-query.dto.ts
       login.dto.ts
       refresh-token.dto.ts
     users.controller.ts
@@ -92,6 +116,10 @@ src/
     policies.module.ts
     rag.controller.ts
     rag.module.ts
+    claims.controller.ts
+    claims.module.ts
+    adjudication.controller.ts
+    adjudication.module.ts
 ```
 
 - `domain/entity` — TypeORM entity classes. `User.role` is the enum `admin` | `employee` on `user.entity.ts`. The table name is `auth_users`, because `public.users` already exists for another role set.
@@ -102,8 +130,10 @@ src/
 - The feature module lives in `presentation/` and is the only file that imports infrastructure. `TypeOrmModule.forFeature` stays on that module. Do not register entities again in `TypeOrmModule.forRoot`.
 - Users: `POST /users`, `GET /users`, `GET /users/:id`. No update or delete. Responses never include `password`.
 - Auth: `POST /auth/login` and `POST /auth/refresh` only. Login checks the hashed password and returns an access token plus a refresh token.
-- Policies: `POST /policies` (multipart field `document`, PDF or DOCX only), `GET /policies`, `GET /policies/:id`, `DELETE /policies/:id`. No update. `name`, `version`, and `language` are unique together. `type` is `HEALTH` | `MOTOR` | `PROPERTY`. `language` is `ar` | `en`. After a successful upload the policy `status` is `UPLOADED`. Indexation then moves it through `PROCESSING` to `INDEXED` or `FAILED`, and `currentStage`, `errorCode`, and `errorMessage` record the latest stage.
+- Policies: `POST /policies` (multipart field `document`, PDF or DOCX only), `GET /policies`, `GET /policies/options`, `GET /policies/:id`, `DELETE /policies/:id`. No update. `name`, `version`, and `language` are unique together. `type` is `HEALTH` | `MOTOR` | `PROPERTY`. `language` is `ar` | `en`. After a successful upload the policy `status` is `UPLOADED`. Indexation then moves it through `PROCESSING` to `INDEXED` or `FAILED`, and `currentStage`, `errorCode`, and `errorMessage` record the latest stage.
 - Retrieval: `POST /rag/retrieve` only. It returns ranked chunks and citations, or a refusal when evidence is weak. It does not generate an answer. `policyId`, `policyVersionId`, and `documentId` all filter `policy_chunks.policy_id`. `language` filters only when it is `ar` or `en`.
+- Claims: `POST /claims`, `GET /claims/types`, `GET /claims`, `GET /claims/:id`, `PATCH /claims/:id`. These routes require `Authorization: Bearer <accessToken>`. A new claim is `SUBMITTED`. The client cannot set `status`, `createdBy`, or `claimNumber`. `admin` can read and update every claim. `employee` can read and update only claims they created. Deleting a policy that still has claims returns `409` `POLICY_HAS_CLAIMS`.
+- Analysis: `POST /claims/:id/analyze` and `GET /claims/:id/analysis` use the same access token and the same admin/employee rule. The incident date selects one policy row with the same name and language. Retrieval stays in `RagService`. Payout is calculated in code. `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` configure the model call.
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -136,8 +166,8 @@ export class UsersModule {}
 - Controllers stay thin. Business logic lives in `application` services. Data access lives in `infrastructure` behind the `domain` repository port.
 - Entities are TypeORM classes. Rely on `autoLoadEntities`; do not list them again in `TypeOrmModule.forRoot`.
 - Type request bodies as DTO classes with `class-validator` decorators so the global pipe can validate them.
-- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CHUNK_MAX_TOKENS`, `CHUNK_OVERLAP_TOKENS`, `RAG_TOP_K`, `RAG_DENSE_TOP_K`, `RAG_KEYWORD_TOP_K`, `RAG_FINAL_TOP_K`, `RAG_MIN_SCORE`, `RAG_RERANK_ENABLED`.
-- CORS is already configured in `main.ts`. Access tokens use `JWT_SECRET` and `JWT_EXPIRES_IN`. Refresh tokens use `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRES_IN`. Route guards are not applied yet.
+- Read config from `process.env`. Names in use: `PORT`, `NODE_ENV`, `ONLINE_DATABASE_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `CHUNK_MAX_TOKENS`, `CHUNK_OVERLAP_TOKENS`, `RAG_TOP_K`, `RAG_DENSE_TOP_K`, `RAG_KEYWORD_TOP_K`, `RAG_FINAL_TOP_K`, `RAG_MIN_SCORE`, `RAG_RERANK_ENABLED`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`.
+- CORS is already configured in `main.ts`. Access tokens use `JWT_SECRET` and `JWT_EXPIRES_IN`. Refresh tokens use `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRES_IN`. The access-token guard is applied on claims routes only.
 - Put uploaded files in `uploads/`. They are publicly served under `/uploads/`. Use `files` from `src/infrastructure/files.ts` for Multer upload, name, url, add, remove, and replace. Do not write upload handling in a controller.
 - `synchronize: true` is for local/dev schema sync. Do not treat it as a production migration strategy.
 - When a module's endpoints are finished, add them to the Postman files in `postman/`. One collection per module, named `<module>.postman_collection.json`, with a folder of the same name. Requests use `{{baseUrl}}` and the DTO body. Auth is already in `postman/auth.postman_collection.json`.
